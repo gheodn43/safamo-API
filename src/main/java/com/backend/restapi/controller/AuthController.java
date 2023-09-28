@@ -27,6 +27,7 @@ import com.backend.restapi.models.UserEntity;
 import com.backend.restapi.repository.RoleRepository;
 import com.backend.restapi.repository.UserRepository;
 import com.backend.restapi.security.JWTGenerator;
+import com.backend.restapi.service.OtpService;
 import com.backend.restapi.service.UserService;
 
 import java.util.Collections;
@@ -46,6 +47,8 @@ public class AuthController {
 
     @Autowired
     private UserService userService;
+    @Autowired
+    private OtpService otpService ;
     @Autowired
     public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository,
                           RoleRepository roleRepository, PasswordEncoder passwordEncoder, JWTGenerator jwtGenerator) {
@@ -82,17 +85,22 @@ public class AuthController {
         if (userRepository.existsByUsername(registerDto.getUsername())) {
             return new ResponseEntity<>("Username is taken!", HttpStatus.BAD_REQUEST);
         }
+        if (!otpService.verifyOTP(registerDto.getEmail(), registerDto.getOtp())) {
+            return new ResponseEntity<>("Invalid OTP!", HttpStatus.BAD_REQUEST);
+        }
 
         UserEntity user = new UserEntity();
         user.setUsername(registerDto.getUsername());
         user.setPassword(passwordEncoder.encode((registerDto.getPassword())));
-
-        Role roles = roleRepository.findByName("CUSTOMER").get();
-        user.setRoles(Collections.singletonList(roles));
+        user.setEmail(registerDto.getEmail());
+        Role roles = roleRepository.findByName("CUSTOMER").orElse(null);
+        if (roles != null) {
+            user.setRoles(Collections.singletonList(roles));
+        }
 
         userRepository.save(user);
 
-        return new ResponseEntity<>("User registered success!", HttpStatus.OK);
+        return new ResponseEntity<>("User registered successfully!", HttpStatus.OK);
     }
     private int getUserIdFromDatabaseOrStorage(String username) {
         try {
